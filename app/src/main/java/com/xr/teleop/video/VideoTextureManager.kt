@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.util.Log
 import com.xr.teleop.NativeBridge
 import kotlinx.coroutines.*
+import kotlinx.coroutines.currentCoroutineContext
 import java.io.BufferedInputStream
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -78,7 +79,7 @@ class VideoTextureManager(private val context: Context) {
     // -------------------------------------------------------------------------
 
     private suspend fun runStream(url: String) {
-        while (running && isActive) {
+        while (running && currentCoroutineContext().isActive) {
             try {
                 connectAndReadMjpeg(url)
             } catch (e: CancellationException) {
