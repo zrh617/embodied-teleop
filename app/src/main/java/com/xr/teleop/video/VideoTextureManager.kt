@@ -57,7 +57,8 @@ class VideoTextureManager(private val context: Context) {
     fun startStream(baseUrl: String, streamType: String = "color") {
         stopStream()
         running = true
-        val url = "$baseUrl/$streamType"
+        // Python server routes are /stream/color and /stream/depth
+        val url = "$baseUrl/stream/$streamType"
         Log.i(TAG, "Starting MJPEG stream from $url")
         streamJob = scope.launch {
             runStream(url)

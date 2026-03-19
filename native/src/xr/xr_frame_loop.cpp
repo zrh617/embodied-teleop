@@ -62,7 +62,7 @@ bool RenderFrame(Runtime* runtime, std::string* error) {
     frame_end_info.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
     XrCompositionLayerPassthroughFB passthrough_layer{
         XR_TYPE_COMPOSITION_LAYER_PASSTHROUGH_FB};
-    passthrough_layer.flags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
+    passthrough_layer.flags = 0;  // No flags needed for passthrough background
     passthrough_layer.space = XR_NULL_HANDLE;
     passthrough_layer.layerHandle = runtime->passthrough_layer;
 
