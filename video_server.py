@@ -128,13 +128,12 @@ async def shutdown_event():
     video_server.cleanup()
 
 
-def gen_h264_stream(frame_type='color'):
+async def gen_h264_stream(frame_type='color'):
     """
     生成H.264编码的MJPEG流
     适合VR应用直接显示（低延迟）
     """
     fps = 30
-    frame_skip = 0
     
     while True:
         frame = video_server.get_latest_frame(frame_type)
