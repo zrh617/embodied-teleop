@@ -21,6 +21,12 @@ class XRActivity : Activity() {
                     or android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                     or android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY)
 
+            if (!NativeBridge.isLibraryLoaded()) {
+                Log.e(TAG, "Native library failed to load, cannot initialize XR")
+                finish()
+                return
+            }
+
             if (!NativeBridge.nativeInit(this)) {
                 Log.e(TAG, "Native initialization failed")
                 finish()

@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <sstream>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -76,12 +77,33 @@ bool CreateInstance(JavaVM* vm, jobject activity, Runtime* runtime, std::string*
     runtime->loader_initialized = true;
     common::LogInfo(kLogTag, "OpenXR loader initialized");
 
-    const std::array<const char*, 4> required_extensions = {
+    // Query available extensions to determine passthrough support
+    uint32_t ext_count = 0;
+    xrEnumerateInstanceExtensionProperties(nullptr, 0, &ext_count, nullptr);
+    std::vector<XrExtensionProperties> available_extensions(ext_count, {XR_TYPE_EXTENSION_PROPERTIES});
+    xrEnumerateInstanceExtensionProperties(nullptr, ext_count, &ext_count, available_extensions.data());
+
+    bool passthrough_available = false;
+    for (const auto& ext : available_extensions) {
+        if (std::string(ext.extensionName) == XR_FB_PASSTHROUGH_EXTENSION_NAME) {
+            passthrough_available = true;
+            break;
+        }
+    }
+    if (passthrough_available) {
+        common::LogInfo(kLogTag, "XR_FB_PASSTHROUGH_EXTENSION available, enabling passthrough.");
+    } else {
+        common::LogInfo(kLogTag, "XR_FB_PASSTHROUGH_EXTENSION not available, skipping passthrough.");
+    }
+
+    std::vector<const char*> enabled_extensions = {
         XR_KHR_ANDROID_CREATE_INSTANCE_EXTENSION_NAME,
         XR_KHR_ANDROID_SURFACE_SWAPCHAIN_EXTENSION_NAME,
         XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME,
-        XR_FB_PASSTHROUGH_EXTENSION_NAME,
     };
+    if (passthrough_available) {
+        enabled_extensions.push_back(XR_FB_PASSTHROUGH_EXTENSION_NAME);
+    }
 
     XrInstanceCreateInfo create_info{XR_TYPE_INSTANCE_CREATE_INFO};
     XrInstanceCreateInfoAndroidKHR android_create_info{
@@ -102,8 +124,8 @@ bool CreateInstance(JavaVM* vm, jobject activity, Runtime* runtime, std::string*
         XR_MAX_ENGINE_NAME_SIZE,
         "%s",
         "teleop");
-    create_info.enabledExtensionCount = static_cast<uint32_t>(required_extensions.size());
-    create_info.enabledExtensionNames = required_extensions.data();
+    create_info.enabledExtensionCount = static_cast<uint32_t>(enabled_extensions.size());
+    create_info.enabledExtensionNames = enabled_extensions.data();
 
     if (!CheckXr(
             XR_NULL_HANDLE,
@@ -129,7 +151,7 @@ bool CreateInstance(JavaVM* vm, jobject activity, Runtime* runtime, std::string*
     common::LogInfo(kLogTag, "XR system obtained successfully");
 
     runtime->instance_ready = true;
-    runtime->passthrough_supported = true;
+    runtime->passthrough_supported = passthrough_available;
     common::LogInfo(kLogTag, "OpenXR instance created successfully.");
     return true;
 }
