@@ -145,32 +145,21 @@ bool StartPassthrough(teleop::xr::Runtime* runtime, std::string* error) {
         return true;
     }
 
-    std::string passthrough_error;
-    XrResult start_result = runtime->xr_passthrough_start_fb(runtime->passthrough);
-    if (!XR_SUCCEEDED(start_result)) {
-        // Log the error but don't fail - passthrough is not critical to app functionality
-        if (error != nullptr && passthrough_error.empty()) {
-            passthrough_error = "xrPassthroughStartFB failed with " + 
-                              FormatXrResult(runtime->instance, start_result);
-            teleop::common::LogError(kLogTag, passthrough_error.c_str());
-        }
-        // Continue without passthrough rather than crashing
-        return true;
-    }
-
+    // Passthrough and layer were created with XR_PASSTHROUGH_IS_RUNNING_AT_CREATION_BIT_FB,
+    // so they are already running — just mark the state and resume the layer.
     XrResult layer_result = runtime->xr_passthrough_layer_resume_fb(runtime->passthrough_layer);
     if (!XR_SUCCEEDED(layer_result)) {
-        // Log but don't fail
-        if (error != nullptr && passthrough_error.empty()) {
-            passthrough_error = "xrPassthroughLayerResumeFB failed with " + 
-                              FormatXrResult(runtime->instance, layer_result);
-            teleop::common::LogError(kLogTag, passthrough_error.c_str());
-        }
+        teleop::common::LogError(
+            kLogTag,
+            ("xrPassthroughLayerResumeFB failed with " +
+             FormatXrResult(runtime->instance, layer_result))
+                .c_str());
+        // Non-fatal: continue without passthrough
         return true;
     }
 
     runtime->passthrough_running = true;
-    teleop::common::LogInfo(kLogTag, "Passthrough started successfully");
+    teleop::common::LogInfo(kLogTag, "Passthrough layer resumed successfully");
     return true;
 }
 
