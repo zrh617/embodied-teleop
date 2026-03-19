@@ -1,5 +1,7 @@
 #include "xr/xr_runtime.h"
 
+#include "video/video_texture_bridge.h"
+
 #include <sstream>
 #include <string>
 
@@ -87,6 +89,9 @@ bool RenderFrame(Runtime* runtime, std::string* error) {
     }
     if (runtime->quad_layer_ready && runtime->quad_swapchain != XR_NULL_HANDLE &&
         runtime->app_space != XR_NULL_HANDLE) {
+        // Draw the latest video frame into the quad surface every frame.
+        // Falls back to keeping whatever was last drawn if no new frame arrived.
+        teleop::video::DrawVideoFrameToWindow(runtime->quad_window);
         layers[layer_count++] =
             reinterpret_cast<const XrCompositionLayerBaseHeader*>(&quad_layer);
     }

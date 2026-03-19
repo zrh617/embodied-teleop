@@ -27,5 +27,8 @@ object NativeBridge {
     external fun nativeRequestExit()
     external fun nativeGetStatus(): String
 
+    // Push a decoded video frame (Android ARGB_8888 int array) into the native renderer.
+    external fun nativeUpdateVideoFrame(pixelData: IntArray, width: Int, height: Int)
+
     fun isLibraryLoaded(): Boolean = libraryLoaded
 }

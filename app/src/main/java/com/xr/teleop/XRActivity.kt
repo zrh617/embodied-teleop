@@ -4,9 +4,17 @@ import android.app.Activity
 import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
+import com.xr.teleop.video.VideoTextureManager
 
 class XRActivity : Activity() {
     private var nativeInitialized = false
+    private var videoManager: VideoTextureManager? = null
+
+    // Change this to your server's IP and port
+    private val videoServerUrl: String
+        get() = intent?.getStringExtra("video_server_url") ?: "http://192.168.1.100:8000"
+    private val videoStreamType: String
+        get() = intent?.getStringExtra("stream_type") ?: "color"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,6 +41,7 @@ class XRActivity : Activity() {
                 return
             }
             nativeInitialized = true
+            videoManager = VideoTextureManager(this)
             Log.i(TAG, "XRActivity initialized successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error during XRActivity.onCreate: ${e.message}", e)
@@ -45,6 +54,8 @@ class XRActivity : Activity() {
         try {
             if (nativeInitialized) {
                 NativeBridge.nativeOnResume()
+                videoManager?.startStream(videoServerUrl, videoStreamType)
+                Log.i(TAG, "Video stream started: $videoServerUrl/$videoStreamType")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error during onResume: ${e.message}", e)
@@ -54,6 +65,7 @@ class XRActivity : Activity() {
     override fun onPause() {
         try {
             if (nativeInitialized) {
+                videoManager?.stopStream()
                 NativeBridge.nativeOnPause()
             }
         } catch (e: Exception) {
@@ -64,6 +76,7 @@ class XRActivity : Activity() {
 
     override fun onDestroy() {
         try {
+            videoManager?.cleanup()
             if (nativeInitialized) {
                 NativeBridge.nativeRequestExit()
             }

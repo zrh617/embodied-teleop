@@ -14,6 +14,7 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
     src/renderer/video_pipeline.cpp
     src/renderer/hud_renderer.cpp
     src/video/video_texture_bridge.cpp
+    src/video/video_texture_jni.cpp
     src/video/video_timing.cpp
     src/input/pose_provider.cpp
     src/input/controller_input.cpp
