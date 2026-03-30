@@ -36,6 +36,20 @@ struct Runtime {
     uint64_t frame_count = 0;
     int32_t quad_width = 1024;
     int32_t quad_height = 1024;
+
+    XrActionSet action_set = XR_NULL_HANDLE;
+    XrAction hand_pose_action = XR_NULL_HANDLE;
+    XrPath left_hand_path = XR_NULL_PATH;
+    XrPath right_hand_path = XR_NULL_PATH;
+    XrSpace left_hand_space = XR_NULL_HANDLE;
+    XrSpace right_hand_space = XR_NULL_HANDLE;
+    bool actions_ready = false;
+
+    bool left_hand_active = false;
+    bool right_hand_active = false;
+    XrPosef left_hand_pose{};
+    XrPosef right_hand_pose{};
+
     PFN_xrCreatePassthroughFB xr_create_passthrough_fb = nullptr;
     PFN_xrDestroyPassthroughFB xr_destroy_passthrough_fb = nullptr;
     PFN_xrPassthroughStartFB xr_passthrough_start_fb = nullptr;
@@ -65,9 +79,13 @@ void DestroySession(Runtime* runtime);
 bool PumpEvents(Runtime* runtime, std::string* error);
 bool RenderFrame(Runtime* runtime, std::string* error);
 
+bool CreateActions(Runtime* runtime, std::string* error);
+void DestroyActions(Runtime* runtime);
+bool UpdateHandPoses(Runtime* runtime, XrTime display_time, std::string* error);
+
 std::string DescribeInstance(const Runtime* runtime);
 std::string DescribeSession(const Runtime* runtime);
 std::string DescribeFrameLoop(const Runtime* runtime);
-std::string DescribeActions();
+std::string DescribeActions(const Runtime* runtime);
 
 }  // namespace teleop::xr

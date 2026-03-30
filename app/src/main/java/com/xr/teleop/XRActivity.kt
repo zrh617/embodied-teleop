@@ -1,4 +1,4 @@
-﻿package com.xr.teleop
+package com.xr.teleop
 
 import android.app.Activity
 import android.os.Bundle
@@ -9,6 +9,7 @@ import android.view.WindowManager
 import com.xr.teleop.video.VideoTextureManager
 import com.xr.teleop.xr.XrWsClient
 import com.xr.teleop.xr.createTestXrControllerState
+import com.xr.teleop.xr.parseXrControllerStateJson
 
 class XRActivity : Activity() {
     private var nativeInitialized = false
@@ -17,7 +18,14 @@ class XRActivity : Activity() {
     private val stateSenderHandler = Handler(Looper.getMainLooper())
     private val stateSender = object : Runnable {
         override fun run() {
-            xrWsClient?.sendState(createTestXrControllerState())
+            val state = try {
+                val payload = NativeBridge.nativeGetControllerStateJson()
+                parseXrControllerStateJson(payload)
+            } catch (e: Exception) {
+                Log.w(TAG, "Using test controller state fallback", e)
+                createTestXrControllerState()
+            }
+            xrWsClient?.sendState(state)
             stateSenderHandler.postDelayed(this, XR_STATE_SEND_INTERVAL_MS)
         }
     }
@@ -70,6 +78,7 @@ class XRActivity : Activity() {
             if (nativeInitialized) {
                 NativeBridge.nativeOnResume()
                 videoManager?.startStream(videoServerUrl, videoStreamType)
+                // connect() 内部有幂等保护，如果 WS 已连接则跳过
                 xrWsClient?.connect()
                 stateSenderHandler.removeCallbacks(stateSender)
                 stateSenderHandler.post(stateSender)
@@ -84,7 +93,8 @@ class XRActivity : Activity() {
     override fun onPause() {
         try {
             stateSenderHandler.removeCallbacks(stateSender)
-            xrWsClient?.disconnect()
+            // 不断开 WS — Quest onPause 经常被轻微头部移动触发，断开会导致机器人失控
+            xrWsClient?.pause()
             if (nativeInitialized) {
                 videoManager?.stopStream()
                 NativeBridge.nativeOnPause()

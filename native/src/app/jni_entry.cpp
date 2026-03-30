@@ -1,6 +1,7 @@
 #include "app/app_runtime.h"
 
 #include <jni.h>
+#include <string>
 
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_xr_teleop_NativeBridge_nativeInit(JNIEnv* env, jobject thiz, jobject activity) {
@@ -36,4 +37,11 @@ Java_com_xr_teleop_NativeBridge_nativeGetStatus(JNIEnv* env, jobject thiz) {
     (void)thiz;
     const std::string status = teleop::app::GetStatus();
     return env->NewStringUTF(status.c_str());
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_xr_teleop_NativeBridge_nativeGetControllerStateJson(JNIEnv* env, jobject thiz) {
+    (void)thiz;
+    const std::string payload = teleop::app::GetControllerStateJson();
+    return env->NewStringUTF(payload.c_str());
 }

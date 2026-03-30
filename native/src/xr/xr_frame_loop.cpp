@@ -60,6 +60,11 @@ bool RenderFrame(Runtime* runtime, std::string* error) {
     XrFrameEndInfo frame_end_info{XR_TYPE_FRAME_END_INFO};
     frame_end_info.displayTime = frame_state.predictedDisplayTime;
     frame_end_info.environmentBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
+
+    if (!UpdateHandPoses(runtime, frame_state.predictedDisplayTime, error)) {
+        return false;
+    }
+
     XrCompositionLayerPassthroughFB passthrough_layer{
         XR_TYPE_COMPOSITION_LAYER_PASSTHROUGH_FB};
     passthrough_layer.flags = 0;  // No flags needed for passthrough background

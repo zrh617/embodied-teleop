@@ -331,6 +331,11 @@ bool CreateSession(
         return false;
     }
 
+    if (!CreateActions(runtime, error)) {
+        DestroySession(runtime);
+        return false;
+    }
+
     if (runtime->passthrough_supported) {
         if (!LoadPassthroughFunctions(runtime, error)) {
             DestroySession(runtime);
@@ -425,6 +430,8 @@ void DestroySession(Runtime* runtime) {
             }
             runtime->session_running = false;
         }
+
+        DestroyActions(runtime);
 
         // Destroy reference space first
         if (runtime->app_space != XR_NULL_HANDLE) {

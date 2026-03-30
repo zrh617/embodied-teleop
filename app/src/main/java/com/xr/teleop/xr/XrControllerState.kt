@@ -1,4 +1,4 @@
-﻿package com.xr.teleop.xr
+package com.xr.teleop.xr
 
 import java.util.concurrent.atomic.AtomicLong
 import org.json.JSONObject
@@ -102,6 +102,58 @@ fun createTestXrControllerState(tsMs: Long = System.currentTimeMillis()): XrCont
                 system = false,
             ),
         ),
+    )
+}
+
+fun parseXrControllerStateJson(json: String): XrControllerState {
+    val root = JSONObject(json)
+
+    fun parseVec2(obj: JSONObject): Vec2 = Vec2(
+        x = obj.optDouble("x", 0.0).toFloat(),
+        y = obj.optDouble("y", 0.0).toFloat(),
+    )
+
+    fun parseVec3(obj: JSONObject): Vec3 = Vec3(
+        x = obj.optDouble("x", 0.0).toFloat(),
+        y = obj.optDouble("y", 0.0).toFloat(),
+        z = obj.optDouble("z", 0.0).toFloat(),
+    )
+
+    fun parseQuat(obj: JSONObject): Quat = Quat(
+        x = obj.optDouble("x", 0.0).toFloat(),
+        y = obj.optDouble("y", 0.0).toFloat(),
+        z = obj.optDouble("z", 0.0).toFloat(),
+        w = obj.optDouble("w", 1.0).toFloat(),
+    )
+
+    fun parseButtons(obj: JSONObject): Buttons = Buttons(
+        primary = obj.optBoolean("primary", false),
+        secondary = obj.optBoolean("secondary", false),
+        thumbstickClick = obj.optBoolean("thumbstick_click", false),
+        menu = obj.optBoolean("menu", false),
+        system = obj.optBoolean("system", false),
+    )
+
+    fun parseController(obj: JSONObject): ControllerState = ControllerState(
+        connected = obj.optBoolean("connected", false),
+        pos = parseVec3(obj.optJSONObject("pos") ?: JSONObject()),
+        rot = parseQuat(obj.optJSONObject("rot") ?: JSONObject()),
+        thumbstick = parseVec2(obj.optJSONObject("thumbstick") ?: JSONObject()),
+        trigger = obj.optDouble("trigger", 0.0).toFloat(),
+        squeeze = obj.optDouble("squeeze", 0.0).toFloat(),
+        buttons = parseButtons(obj.optJSONObject("buttons") ?: JSONObject()),
+    )
+
+    return XrControllerState(
+        type = root.optString("type", "xr_controller_state"),
+        tsMs = root.optLong("ts_ms", System.currentTimeMillis()),
+        seq = root.optLong("seq", sequenceGenerator.incrementAndGet()),
+        head = HeadState(
+            pos = parseVec3(root.optJSONObject("head")?.optJSONObject("pos") ?: JSONObject()),
+            rot = parseQuat(root.optJSONObject("head")?.optJSONObject("rot") ?: JSONObject()),
+        ),
+        left = parseController(root.optJSONObject("left") ?: JSONObject()),
+        right = parseController(root.optJSONObject("right") ?: JSONObject()),
     )
 }
 

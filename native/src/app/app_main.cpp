@@ -183,7 +183,7 @@ std::string BuildStatus() {
            << "\n" << teleop::xr::DescribeInstance(&g_app.xr_runtime)
            << "\n" << teleop::xr::DescribeSession(&g_app.xr_runtime)
            << "\n" << teleop::xr::DescribeFrameLoop(&g_app.xr_runtime)
-           << "\n" << teleop::xr::DescribeActions()
+           << "\n" << teleop::xr::DescribeActions(&g_app.xr_runtime)
            << "\n" << teleop::renderer::DescribeVulkanContext(&g_app.vk_context)
            << "\n" << teleop::renderer::DescribeCurvedScreen()
            << "\n" << teleop::renderer::DescribeVideoPipeline()
@@ -285,6 +285,58 @@ void RequestExit() {
 
 std::string GetStatus() {
     return BuildStatus();
+}
+
+std::string GetControllerStateJson() {
+    bool left_active = g_app.xr_runtime.left_hand_active;
+    bool right_active = g_app.xr_runtime.right_hand_active;
+    XrPosef left_pose = g_app.xr_runtime.left_hand_pose;
+    XrPosef right_pose = g_app.xr_runtime.right_hand_pose;
+
+    const uint64_t ts_ms = teleop::common::NowMonotonicNanos() / 1000000ULL;
+
+    std::ostringstream stream;
+    stream << "{";
+    stream << "\"type\":\"xr_controller_state\",";
+    stream << "\"ts_ms\":" << ts_ms << ",";
+    stream << "\"seq\":" << ts_ms << ",";
+    stream << "\"head\":{";
+    stream << "\"pos\":{\"x\":0.0,\"y\":0.0,\"z\":0.0},";
+    stream << "\"rot\":{\"x\":0.0,\"y\":0.0,\"z\":0.0,\"w\":1.0}";
+    stream << "},";
+
+    stream << "\"left\":{";
+    stream << "\"connected\":" << (left_active ? "true" : "false") << ",";
+    stream << "\"pos\":{";
+    stream << "\"x\":" << left_pose.position.x << ",";
+    stream << "\"y\":" << left_pose.position.y << ",";
+    stream << "\"z\":" << left_pose.position.z;
+    stream << "},";
+    stream << "\"rot\":{";
+    stream << "\"x\":" << left_pose.orientation.x << ",";
+    stream << "\"y\":" << left_pose.orientation.y << ",";
+    stream << "\"z\":" << left_pose.orientation.z << ",";
+    stream << "\"w\":" << left_pose.orientation.w;
+    stream << "}";
+    stream << "},";
+
+    stream << "\"right\":{";
+    stream << "\"connected\":" << (right_active ? "true" : "false") << ",";
+    stream << "\"pos\":{";
+    stream << "\"x\":" << right_pose.position.x << ",";
+    stream << "\"y\":" << right_pose.position.y << ",";
+    stream << "\"z\":" << right_pose.position.z;
+    stream << "},";
+    stream << "\"rot\":{";
+    stream << "\"x\":" << right_pose.orientation.x << ",";
+    stream << "\"y\":" << right_pose.orientation.y << ",";
+    stream << "\"z\":" << right_pose.orientation.z << ",";
+    stream << "\"w\":" << right_pose.orientation.w;
+    stream << "}";
+    stream << "}";
+    stream << "}";
+
+    return stream.str();
 }
 
 }  // namespace teleop::app
