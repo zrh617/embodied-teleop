@@ -8,14 +8,9 @@ namespace {
 
 constexpr const char* kActionSetName = "teleop_actions";
 constexpr const char* kActionSetLocalizedName = "Teleop Actions";
-constexpr const char* kHandPoseActionName = "hand_pose";
-constexpr const char* kHandPoseActionLocalizedName = "Hand Pose";
 
 bool CheckXr(XrInstance instance, XrResult result, const char* step, std::string* error) {
-    if (XR_SUCCEEDED(result)) {
-        return true;
-    }
-
+    if (XR_SUCCEEDED(result)) return true;
     if (error != nullptr) {
         char buffer[XR_MAX_RESULT_STRING_SIZE];
         buffer[0] = '\0';
@@ -27,6 +22,39 @@ bool CheckXr(XrInstance instance, XrResult result, const char* step, std::string
         }
     }
     return false;
+}
+
+bool CreateFloatAction(XrInstance inst, XrActionSet aset, const char* name,
+                       const char* loc, uint32_t n, const XrPath* paths,
+                       XrAction* out, std::string* err) {
+    XrActionCreateInfo i{XR_TYPE_ACTION_CREATE_INFO};
+    i.actionType = XR_ACTION_TYPE_FLOAT_INPUT;
+    std::snprintf(i.actionName, XR_MAX_ACTION_NAME_SIZE, "%s", name);
+    std::snprintf(i.localizedActionName, XR_MAX_LOCALIZED_ACTION_SET_NAME_SIZE, "%s", loc);
+    i.countSubactionPaths = n; i.subactionPaths = paths;
+    return CheckXr(inst, xrCreateAction(aset, &i, out), name, err);
+}
+
+bool CreateBoolAction(XrInstance inst, XrActionSet aset, const char* name,
+                      const char* loc, uint32_t n, const XrPath* paths,
+                      XrAction* out, std::string* err) {
+    XrActionCreateInfo i{XR_TYPE_ACTION_CREATE_INFO};
+    i.actionType = XR_ACTION_TYPE_BOOLEAN_INPUT;
+    std::snprintf(i.actionName, XR_MAX_ACTION_NAME_SIZE, "%s", name);
+    std::snprintf(i.localizedActionName, XR_MAX_LOCALIZED_ACTION_SET_NAME_SIZE, "%s", loc);
+    i.countSubactionPaths = n; i.subactionPaths = paths;
+    return CheckXr(inst, xrCreateAction(aset, &i, out), name, err);
+}
+
+bool CreateVec2Action(XrInstance inst, XrActionSet aset, const char* name,
+                      const char* loc, uint32_t n, const XrPath* paths,
+                      XrAction* out, std::string* err) {
+    XrActionCreateInfo i{XR_TYPE_ACTION_CREATE_INFO};
+    i.actionType = XR_ACTION_TYPE_VECTOR2F_INPUT;
+    std::snprintf(i.actionName, XR_MAX_ACTION_NAME_SIZE, "%s", name);
+    std::snprintf(i.localizedActionName, XR_MAX_LOCALIZED_ACTION_SET_NAME_SIZE, "%s", loc);
+    i.countSubactionPaths = n; i.subactionPaths = paths;
+    return CheckXr(inst, xrCreateAction(aset, &i, out), name, err);
 }
 
 }  // namespace
@@ -41,143 +69,144 @@ bool CreateActions(Runtime* runtime, std::string* error) {
         return false;
     }
 
+    // ── Action set ────────────────────────────────────────────────────────────
     XrActionSetCreateInfo action_set_info{XR_TYPE_ACTION_SET_CREATE_INFO};
     std::snprintf(action_set_info.actionSetName, XR_MAX_ACTION_SET_NAME_SIZE, "%s", kActionSetName);
-    std::snprintf(
-        action_set_info.localizedActionSetName,
-        XR_MAX_LOCALIZED_ACTION_SET_NAME_SIZE,
-        "%s",
-        kActionSetLocalizedName);
+    std::snprintf(action_set_info.localizedActionSetName, XR_MAX_LOCALIZED_ACTION_SET_NAME_SIZE, "%s", kActionSetLocalizedName);
     action_set_info.priority = 0;
-
-    if (!CheckXr(
-            runtime->instance,
-            xrCreateActionSet(runtime->instance, &action_set_info, &runtime->action_set),
-            "xrCreateActionSet",
-            error)) {
+    if (!CheckXr(runtime->instance, xrCreateActionSet(runtime->instance, &action_set_info, &runtime->action_set), "xrCreateActionSet", error)) {
         return false;
     }
 
-    if (!CheckXr(
-            runtime->instance,
-            xrStringToPath(runtime->instance, "/user/hand/left", &runtime->left_hand_path),
-            "xrStringToPath(/user/hand/left)",
-            error) ||
-        !CheckXr(
-            runtime->instance,
-            xrStringToPath(runtime->instance, "/user/hand/right", &runtime->right_hand_path),
-            "xrStringToPath(/user/hand/right)",
-            error)) {
+    // ── Subaction paths ───────────────────────────────────────────────────────
+    if (!CheckXr(runtime->instance, xrStringToPath(runtime->instance, "/user/hand/left",  &runtime->left_hand_path),  "xrStringToPath(left)",  error) ||
+        !CheckXr(runtime->instance, xrStringToPath(runtime->instance, "/user/hand/right", &runtime->right_hand_path), "xrStringToPath(right)", error)) {
+        DestroyActions(runtime);
         return false;
     }
+    const XrPath both[2] = {runtime->left_hand_path, runtime->right_hand_path};
 
-    XrActionCreateInfo action_info{XR_TYPE_ACTION_CREATE_INFO};
-    action_info.actionType = XR_ACTION_TYPE_POSE_INPUT;
-    std::snprintf(action_info.actionName, XR_MAX_ACTION_NAME_SIZE, "%s", kHandPoseActionName);
-    std::snprintf(
-        action_info.localizedActionName,
-        XR_MAX_LOCALIZED_ACTION_NAME_SIZE,
-        "%s",
-        kHandPoseActionLocalizedName);
+    // ── Pose action ───────────────────────────────────────────────────────────
+    {
+        XrActionCreateInfo ai{XR_TYPE_ACTION_CREATE_INFO};
+        ai.actionType = XR_ACTION_TYPE_POSE_INPUT;
+        std::snprintf(ai.actionName, XR_MAX_ACTION_NAME_SIZE, "hand_pose");
+        std::snprintf(ai.localizedActionName, XR_MAX_LOCALIZED_ACTION_SET_NAME_SIZE, "Hand Pose");
+        ai.countSubactionPaths = 2; ai.subactionPaths = both;
+        if (!CheckXr(runtime->instance, xrCreateAction(runtime->action_set, &ai, &runtime->hand_pose_action), "xrCreateAction(hand_pose)", error)) {
+            DestroyActions(runtime); return false;
+        }
+    }
+    // ── Trigger ───────────────────────────────────────────────────────────────
+    if (!CreateFloatAction(runtime->instance, runtime->action_set, "trigger", "Trigger", 2, both, &runtime->trigger_action, error)) {
+        DestroyActions(runtime); return false;
+    }
+    // ── Squeeze ───────────────────────────────────────────────────────────────
+    if (!CreateFloatAction(runtime->instance, runtime->action_set, "squeeze", "Squeeze", 2, both, &runtime->squeeze_action, error)) {
+        DestroyActions(runtime); return false;
+    }
+    // ── Thumbstick (vec2) ─────────────────────────────────────────────────────
+    if (!CreateVec2Action(runtime->instance, runtime->action_set, "thumbstick", "Thumbstick", 2, both, &runtime->thumbstick_action, error)) {
+        DestroyActions(runtime); return false;
+    }
+    // ── Thumbstick click ──────────────────────────────────────────────────────
+    if (!CreateBoolAction(runtime->instance, runtime->action_set, "thumbstick_click", "Thumbstick Click", 2, both, &runtime->thumbstick_click_action, error)) {
+        DestroyActions(runtime); return false;
+    }
+    // ── A / B (right only) ────────────────────────────────────────────────────
+    if (!CreateBoolAction(runtime->instance, runtime->action_set, "button_a", "Button A", 1, &runtime->right_hand_path, &runtime->button_a_action, error)) {
+        DestroyActions(runtime); return false;
+    }
+    if (!CreateBoolAction(runtime->instance, runtime->action_set, "button_b", "Button B", 1, &runtime->right_hand_path, &runtime->button_b_action, error)) {
+        DestroyActions(runtime); return false;
+    }
+    // ── X / Y (left only) ────────────────────────────────────────────────────
+    if (!CreateBoolAction(runtime->instance, runtime->action_set, "button_x", "Button X", 1, &runtime->left_hand_path, &runtime->button_x_action, error)) {
+        DestroyActions(runtime); return false;
+    }
+    if (!CreateBoolAction(runtime->instance, runtime->action_set, "button_y", "Button Y", 1, &runtime->left_hand_path, &runtime->button_y_action, error)) {
+        DestroyActions(runtime); return false;
+    }
+    // ── Menu (left only) ─────────────────────────────────────────────────────
+    if (!CreateBoolAction(runtime->instance, runtime->action_set, "menu", "Menu", 1, &runtime->left_hand_path, &runtime->menu_action, error)) {
+        DestroyActions(runtime); return false;
+    }
 
-    const XrPath hand_subaction_paths[2] = {
-        runtime->left_hand_path,
-        runtime->right_hand_path,
+    // ── Interaction profile: Oculus Touch Controller ──────────────────────────
+    XrPath touch_profile = XR_NULL_PATH;
+    if (!CheckXr(runtime->instance, xrStringToPath(runtime->instance, "/interaction_profiles/oculus/touch_controller", &touch_profile), "xrStringToPath(touch_controller)", error)) {
+        DestroyActions(runtime); return false;
+    }
+
+    auto ToPath = [&](const char* s, XrPath* out) -> bool {
+        return CheckXr(runtime->instance, xrStringToPath(runtime->instance, s, out), s, error);
     };
-    action_info.countSubactionPaths = 2;
-    action_info.subactionPaths = hand_subaction_paths;
-
-    if (!CheckXr(
-            runtime->instance,
-            xrCreateAction(runtime->action_set, &action_info, &runtime->hand_pose_action),
-            "xrCreateAction",
-            error)) {
-        DestroyActions(runtime);
-        return false;
+    XrPath lg, rg, lt, rt, ls, rs, lts, rts, ltc, rtc, ra, rb, lx, ly, lm;
+    if (!ToPath("/user/hand/left/input/grip/pose",           &lg)  ||
+        !ToPath("/user/hand/right/input/grip/pose",          &rg)  ||
+        !ToPath("/user/hand/left/input/trigger/value",       &lt)  ||
+        !ToPath("/user/hand/right/input/trigger/value",      &rt)  ||
+        !ToPath("/user/hand/left/input/squeeze/value",       &ls)  ||
+        !ToPath("/user/hand/right/input/squeeze/value",      &rs)  ||
+        !ToPath("/user/hand/left/input/thumbstick",          &lts) ||
+        !ToPath("/user/hand/right/input/thumbstick",         &rts) ||
+        !ToPath("/user/hand/left/input/thumbstick/click",    &ltc) ||
+        !ToPath("/user/hand/right/input/thumbstick/click",   &rtc) ||
+        !ToPath("/user/hand/right/input/a/click",            &ra)  ||
+        !ToPath("/user/hand/right/input/b/click",            &rb)  ||
+        !ToPath("/user/hand/left/input/x/click",             &lx)  ||
+        !ToPath("/user/hand/left/input/y/click",             &ly)  ||
+        !ToPath("/user/hand/left/input/menu/click",          &lm)) {
+        DestroyActions(runtime); return false;
     }
 
-    XrPath simple_profile_path = XR_NULL_PATH;
-    XrPath left_grip_pose_path = XR_NULL_PATH;
-    XrPath right_grip_pose_path = XR_NULL_PATH;
-
-    if (!CheckXr(
-            runtime->instance,
-            xrStringToPath(runtime->instance, "/interaction_profiles/khr/simple_controller", &simple_profile_path),
-            "xrStringToPath(simple_controller)",
-            error) ||
-        !CheckXr(
-            runtime->instance,
-            xrStringToPath(runtime->instance, "/user/hand/left/input/grip/pose", &left_grip_pose_path),
-            "xrStringToPath(left_grip_pose)",
-            error) ||
-        !CheckXr(
-            runtime->instance,
-            xrStringToPath(runtime->instance, "/user/hand/right/input/grip/pose", &right_grip_pose_path),
-            "xrStringToPath(right_grip_pose)",
-            error)) {
-        DestroyActions(runtime);
-        return false;
-    }
-
-    XrActionSuggestedBinding bindings[2] = {
-        {runtime->hand_pose_action, left_grip_pose_path},
-        {runtime->hand_pose_action, right_grip_pose_path},
+    XrActionSuggestedBinding bindings[] = {
+        {runtime->hand_pose_action,        lg},
+        {runtime->hand_pose_action,        rg},
+        {runtime->trigger_action,          lt},
+        {runtime->trigger_action,          rt},
+        {runtime->squeeze_action,          ls},
+        {runtime->squeeze_action,          rs},
+        {runtime->thumbstick_action,       lts},
+        {runtime->thumbstick_action,       rts},
+        {runtime->thumbstick_click_action, ltc},
+        {runtime->thumbstick_click_action, rtc},
+        {runtime->button_a_action,         ra},
+        {runtime->button_b_action,         rb},
+        {runtime->button_x_action,         lx},
+        {runtime->button_y_action,         ly},
+        {runtime->menu_action,             lm},
     };
-
-    XrInteractionProfileSuggestedBinding suggested_bindings{
-        XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
-    suggested_bindings.interactionProfile = simple_profile_path;
-    suggested_bindings.countSuggestedBindings = 2;
-    suggested_bindings.suggestedBindings = bindings;
-
-    if (!CheckXr(
-            runtime->instance,
-            xrSuggestInteractionProfileBindings(runtime->instance, &suggested_bindings),
-            "xrSuggestInteractionProfileBindings",
-            error)) {
-        DestroyActions(runtime);
-        return false;
+    XrInteractionProfileSuggestedBinding suggested{XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING};
+    suggested.interactionProfile = touch_profile;
+    suggested.countSuggestedBindings = static_cast<uint32_t>(sizeof(bindings) / sizeof(bindings[0]));
+    suggested.suggestedBindings = bindings;
+    if (!CheckXr(runtime->instance, xrSuggestInteractionProfileBindings(runtime->instance, &suggested), "xrSuggestInteractionProfileBindings", error)) {
+        DestroyActions(runtime); return false;
     }
 
+    // ── Attach ────────────────────────────────────────────────────────────────
     XrSessionActionSetsAttachInfo attach_info{XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO};
     attach_info.countActionSets = 1;
     attach_info.actionSets = &runtime->action_set;
-
-    if (!CheckXr(
-            runtime->instance,
-            xrAttachSessionActionSets(runtime->session, &attach_info),
-            "xrAttachSessionActionSets",
-            error)) {
-        DestroyActions(runtime);
-        return false;
+    if (!CheckXr(runtime->instance, xrAttachSessionActionSets(runtime->session, &attach_info), "xrAttachSessionActionSets", error)) {
+        DestroyActions(runtime); return false;
     }
 
-    XrActionSpaceCreateInfo left_space_info{XR_TYPE_ACTION_SPACE_CREATE_INFO};
-    left_space_info.action = runtime->hand_pose_action;
-    left_space_info.subactionPath = runtime->left_hand_path;
-    left_space_info.poseInActionSpace.orientation.w = 1.0f;
-
-    if (!CheckXr(
-            runtime->instance,
-            xrCreateActionSpace(runtime->session, &left_space_info, &runtime->left_hand_space),
-            "xrCreateActionSpace(left)",
-            error)) {
-        DestroyActions(runtime);
-        return false;
+    // ── Action spaces ─────────────────────────────────────────────────────────
+    XrActionSpaceCreateInfo lsi{XR_TYPE_ACTION_SPACE_CREATE_INFO};
+    lsi.action = runtime->hand_pose_action;
+    lsi.subactionPath = runtime->left_hand_path;
+    lsi.poseInActionSpace.orientation.w = 1.0f;
+    if (!CheckXr(runtime->instance, xrCreateActionSpace(runtime->session, &lsi, &runtime->left_hand_space), "xrCreateActionSpace(left)", error)) {
+        DestroyActions(runtime); return false;
     }
-
-    XrActionSpaceCreateInfo right_space_info{XR_TYPE_ACTION_SPACE_CREATE_INFO};
-    right_space_info.action = runtime->hand_pose_action;
-    right_space_info.subactionPath = runtime->right_hand_path;
-    right_space_info.poseInActionSpace.orientation.w = 1.0f;
-
-    if (!CheckXr(
-            runtime->instance,
-            xrCreateActionSpace(runtime->session, &right_space_info, &runtime->right_hand_space),
-            "xrCreateActionSpace(right)",
-            error)) {
-        DestroyActions(runtime);
-        return false;
+    XrActionSpaceCreateInfo rsi{XR_TYPE_ACTION_SPACE_CREATE_INFO};
+    rsi.action = runtime->hand_pose_action;
+    rsi.subactionPath = runtime->right_hand_path;
+    rsi.poseInActionSpace.orientation.w = 1.0f;
+    if (!CheckXr(runtime->instance, xrCreateActionSpace(runtime->session, &rsi, &runtime->right_hand_space), "xrCreateActionSpace(right)", error)) {
+        DestroyActions(runtime); return false;
     }
 
     runtime->actions_ready = true;
@@ -189,22 +218,24 @@ bool CreateActions(Runtime* runtime, std::string* error) {
 }
 
 void DestroyActions(Runtime* runtime) {
-    if (runtime == nullptr) {
-        return;
-    }
+    if (runtime == nullptr) return;
 
-    if (runtime->left_hand_space != XR_NULL_HANDLE) {
-        xrDestroySpace(runtime->left_hand_space);
-        runtime->left_hand_space = XR_NULL_HANDLE;
-    }
-    if (runtime->right_hand_space != XR_NULL_HANDLE) {
-        xrDestroySpace(runtime->right_hand_space);
-        runtime->right_hand_space = XR_NULL_HANDLE;
-    }
-    if (runtime->hand_pose_action != XR_NULL_HANDLE) {
-        xrDestroyAction(runtime->hand_pose_action);
-        runtime->hand_pose_action = XR_NULL_HANDLE;
-    }
+    auto DS = [](XrSpace& s)  { if (s != XR_NULL_HANDLE) { xrDestroySpace(s);     s = XR_NULL_HANDLE; } };
+    auto DA = [](XrAction& a) { if (a != XR_NULL_HANDLE) { xrDestroyAction(a);    a = XR_NULL_HANDLE; } };
+
+    DS(runtime->left_hand_space);
+    DS(runtime->right_hand_space);
+    DA(runtime->hand_pose_action);
+    DA(runtime->trigger_action);
+    DA(runtime->squeeze_action);
+    DA(runtime->thumbstick_action);
+    DA(runtime->thumbstick_click_action);
+    DA(runtime->button_a_action);
+    DA(runtime->button_b_action);
+    DA(runtime->button_x_action);
+    DA(runtime->button_y_action);
+    DA(runtime->menu_action);
+
     if (runtime->action_set != XR_NULL_HANDLE) {
         xrDestroyActionSet(runtime->action_set);
         runtime->action_set = XR_NULL_HANDLE;
@@ -225,96 +256,97 @@ bool UpdateHandPoses(Runtime* runtime, XrTime display_time, std::string* error) 
 
     XrActiveActionSet active_action_set{};
     active_action_set.actionSet = runtime->action_set;
-
     XrActionsSyncInfo sync_info{XR_TYPE_ACTIONS_SYNC_INFO};
     sync_info.countActiveActionSets = 1;
     sync_info.activeActionSets = &active_action_set;
-
     if (!CheckXr(runtime->instance, xrSyncActions(runtime->session, &sync_info), "xrSyncActions", error)) {
         return false;
     }
 
-    XrActionStateGetInfo left_state_info{XR_TYPE_ACTION_STATE_GET_INFO};
-    left_state_info.action = runtime->hand_pose_action;
-    left_state_info.subactionPath = runtime->left_hand_path;
-    XrActionStatePose left_state{XR_TYPE_ACTION_STATE_POSE};
-    if (!CheckXr(
-            runtime->instance,
-            xrGetActionStatePose(runtime->session, &left_state_info, &left_state),
-            "xrGetActionStatePose(left)",
-            error)) {
-        return false;
-    }
+    // Helper: read float action value for a subaction path
+    auto GetFloat = [&](XrAction action, XrPath subpath) -> float {
+        if (action == XR_NULL_HANDLE) return 0.f;
+        XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};
+        gi.action = action; gi.subactionPath = subpath;
+        XrActionStateFloat s{XR_TYPE_ACTION_STATE_FLOAT};
+        xrGetActionStateFloat(runtime->session, &gi, &s);
+        return s.isActive ? s.currentState : 0.f;
+    };
+    auto GetBool = [&](XrAction action, XrPath subpath) -> bool {
+        if (action == XR_NULL_HANDLE) return false;
+        XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};
+        gi.action = action; gi.subactionPath = subpath;
+        XrActionStateBoolean s{XR_TYPE_ACTION_STATE_BOOLEAN};
+        xrGetActionStateBoolean(runtime->session, &gi, &s);
+        return s.isActive && s.currentState;
+    };
+    auto GetVec2 = [&](XrAction action, XrPath subpath, float& ox, float& oy) {
+        if (action == XR_NULL_HANDLE) { ox = oy = 0.f; return; }
+        XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};
+        gi.action = action; gi.subactionPath = subpath;
+        XrActionStateVector2f s{XR_TYPE_ACTION_STATE_VECTOR2F};
+        xrGetActionStateVector2f(runtime->session, &gi, &s);
+        ox = s.isActive ? s.currentState.x : 0.f;
+        oy = s.isActive ? s.currentState.y : 0.f;
+    };
 
-    XrActionStateGetInfo right_state_info{XR_TYPE_ACTION_STATE_GET_INFO};
-    right_state_info.action = runtime->hand_pose_action;
-    right_state_info.subactionPath = runtime->right_hand_path;
-    XrActionStatePose right_state{XR_TYPE_ACTION_STATE_POSE};
-    if (!CheckXr(
-            runtime->instance,
-            xrGetActionStatePose(runtime->session, &right_state_info, &right_state),
-            "xrGetActionStatePose(right)",
-            error)) {
-        return false;
-    }
+    // ── Analog / button state ─────────────────────────────────────────────────
+    runtime->left_trigger  = GetFloat(runtime->trigger_action,  runtime->left_hand_path);
+    runtime->right_trigger = GetFloat(runtime->trigger_action,  runtime->right_hand_path);
+    runtime->left_squeeze  = GetFloat(runtime->squeeze_action,  runtime->left_hand_path);
+    runtime->right_squeeze = GetFloat(runtime->squeeze_action,  runtime->right_hand_path);
+    GetVec2(runtime->thumbstick_action, runtime->left_hand_path,
+            runtime->left_thumbstick_x,  runtime->left_thumbstick_y);
+    GetVec2(runtime->thumbstick_action, runtime->right_hand_path,
+            runtime->right_thumbstick_x, runtime->right_thumbstick_y);
+    runtime->left_thumbstick_click  = GetBool(runtime->thumbstick_click_action, runtime->left_hand_path);
+    runtime->right_thumbstick_click = GetBool(runtime->thumbstick_click_action, runtime->right_hand_path);
+    runtime->button_a    = GetBool(runtime->button_a_action, runtime->right_hand_path);
+    runtime->button_b    = GetBool(runtime->button_b_action, runtime->right_hand_path);
+    runtime->button_x    = GetBool(runtime->button_x_action, runtime->left_hand_path);
+    runtime->button_y    = GetBool(runtime->button_y_action, runtime->left_hand_path);
+    runtime->button_menu = GetBool(runtime->menu_action,     runtime->left_hand_path);
 
-    bool left_active = false;
-    bool right_active = false;
-    XrPosef left_pose{};
-    XrPosef right_pose{};
-
-    if (left_state.isActive && runtime->left_hand_space != XR_NULL_HANDLE) {
-        XrSpaceLocation left_location{XR_TYPE_SPACE_LOCATION};
-        if (!CheckXr(
-                runtime->instance,
-                xrLocateSpace(runtime->left_hand_space, runtime->app_space, display_time, &left_location),
-                "xrLocateSpace(left)",
-                error)) {
-            return false;
+    // ── Pose state ────────────────────────────────────────────────────────────
+    auto GetPose = [&](XrAction action, XrPath subpath, XrSpace space,
+                       bool& active_out, XrPosef& pose_out) {
+        XrActionStateGetInfo gi{XR_TYPE_ACTION_STATE_GET_INFO};
+        gi.action = action; gi.subactionPath = subpath;
+        XrActionStatePose sp{XR_TYPE_ACTION_STATE_POSE};
+        xrGetActionStatePose(runtime->session, &gi, &sp);
+        active_out = false;
+        if (sp.isActive && space != XR_NULL_HANDLE) {
+            XrSpaceLocation loc{XR_TYPE_SPACE_LOCATION};
+            if (XR_SUCCEEDED(xrLocateSpace(space, runtime->app_space, display_time, &loc))) {
+                const XrSpaceLocationFlags req =
+                    XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+                if ((loc.locationFlags & req) == req) {
+                    active_out = true;
+                    pose_out   = loc.pose;
+                }
+            }
         }
-        const XrSpaceLocationFlags required_flags =
-            XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
-        left_active = (left_location.locationFlags & required_flags) == required_flags;
-        if (left_active) {
-            left_pose = left_location.pose;
-        }
-    }
+    };
 
-    if (right_state.isActive && runtime->right_hand_space != XR_NULL_HANDLE) {
-        XrSpaceLocation right_location{XR_TYPE_SPACE_LOCATION};
-        if (!CheckXr(
-                runtime->instance,
-                xrLocateSpace(runtime->right_hand_space, runtime->app_space, display_time, &right_location),
-                "xrLocateSpace(right)",
-                error)) {
-            return false;
-        }
-        const XrSpaceLocationFlags required_flags =
-            XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
-        right_active = (right_location.locationFlags & required_flags) == required_flags;
-        if (right_active) {
-            right_pose = right_location.pose;
-        }
-    }
-
-    runtime->left_hand_active = left_active;
-    runtime->right_hand_active = right_active;
-    runtime->left_hand_pose = left_pose;
-    runtime->right_hand_pose = right_pose;
+    GetPose(runtime->hand_pose_action, runtime->left_hand_path,
+            runtime->left_hand_space, runtime->left_hand_active, runtime->left_hand_pose);
+    GetPose(runtime->hand_pose_action, runtime->right_hand_path,
+            runtime->right_hand_space, runtime->right_hand_active, runtime->right_hand_pose);
 
     return true;
 }
 
 std::string DescribeActions(const Runtime* runtime) {
-    if (runtime == nullptr) {
-        return "xr.actions=runtime-null";
-    }
-
-    std::ostringstream stream;
-    stream << "xr.actions=" << (runtime->actions_ready ? "ready" : "not-ready")
-           << " left.active=" << (runtime->left_hand_active ? "true" : "false")
-           << " right.active=" << (runtime->right_hand_active ? "true" : "false");
-    return stream.str();
+    if (runtime == nullptr) return "xr.actions=runtime-null";
+    std::ostringstream s;
+    s << "xr.actions=" << (runtime->actions_ready ? "ready" : "not-ready")
+      << " L.active=" << runtime->left_hand_active
+      << " R.active=" << runtime->right_hand_active
+      << " R.trig=" << runtime->right_trigger
+      << " R.sqz=" << runtime->right_squeeze
+      << " R.A=" << runtime->button_a
+      << " R.B=" << runtime->button_b;
+    return s.str();
 }
 
 }  // namespace teleop::xr

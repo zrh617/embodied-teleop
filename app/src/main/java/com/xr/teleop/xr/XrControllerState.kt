@@ -29,6 +29,38 @@ data class Buttons(
     val system: Boolean = false,
 )
 
+// v2: Command types sent from VR to robot system
+enum class TeleopCommandType(val value: Int) {
+    NONE(0),
+    ENABLE(1),
+    DISABLE(2),
+    START_CALIBRATION(3),
+    FINISH_CALIBRATION(4),
+    START_SYNC(5),
+    CONFIRM_FOLLOW(6),
+    STOP_FOLLOW(7),
+    TOGGLE_RECORD(8),
+    TOGGLE_LOCK(9),
+    SOFT_ESTOP(10),
+    CLEAR_ESTOP(11),
+}
+
+data class TeleopCommand(
+    val type: String = "teleop_command",
+    val tsMs: Long = System.currentTimeMillis(),
+    val seq: Long = 0L,
+    val command: Int = TeleopCommandType.NONE.value,
+    val note: String = "",
+) {
+    fun toJsonString(): String = org.json.JSONObject()
+        .put("type", type)
+        .put("ts_ms", tsMs)
+        .put("seq", seq)
+        .put("command", command)
+        .put("note", note)
+        .toString()
+}
+
 data class HeadState(
     val pos: Vec3,
     val rot: Quat,
@@ -40,6 +72,7 @@ data class ControllerState(
     val rot: Quat,
     val thumbstick: Vec2 = Vec2(),
     val trigger: Float = 0f,
+    val grip: Float = 0f,
     val squeeze: Float = 0f,
     val buttons: Buttons = Buttons(),
 )
@@ -134,15 +167,21 @@ fun parseXrControllerStateJson(json: String): XrControllerState {
         system = obj.optBoolean("system", false),
     )
 
-    fun parseController(obj: JSONObject): ControllerState = ControllerState(
-        connected = obj.optBoolean("connected", false),
-        pos = parseVec3(obj.optJSONObject("pos") ?: JSONObject()),
-        rot = parseQuat(obj.optJSONObject("rot") ?: JSONObject()),
-        thumbstick = parseVec2(obj.optJSONObject("thumbstick") ?: JSONObject()),
-        trigger = obj.optDouble("trigger", 0.0).toFloat(),
-        squeeze = obj.optDouble("squeeze", 0.0).toFloat(),
-        buttons = parseButtons(obj.optJSONObject("buttons") ?: JSONObject()),
-    )
+    fun parseController(obj: JSONObject): ControllerState {
+        val hasPose = obj.has("pos") || obj.has("position") || obj.has("rot") || obj.has("orientation")
+        val connected = obj.optBoolean("connected", hasPose) || hasPose
+
+        return ControllerState(
+            connected = connected,
+            pos = parseVec3(obj.optJSONObject("pos") ?: JSONObject()),
+            rot = parseQuat(obj.optJSONObject("rot") ?: JSONObject()),
+            thumbstick = parseVec2(obj.optJSONObject("thumbstick") ?: JSONObject()),
+            trigger = obj.optDouble("trigger", 0.0).toFloat(),
+            grip = obj.optDouble("grip", 0.0).toFloat(),
+            squeeze = obj.optDouble("squeeze", 0.0).toFloat(),
+            buttons = parseButtons(obj.optJSONObject("buttons") ?: JSONObject()),
+        )
+    }
 
     return XrControllerState(
         type = root.optString("type", "xr_controller_state"),
@@ -170,6 +209,7 @@ private fun ControllerState.toJson(): JSONObject {
         .put("rot", rot.toJson())
         .put("thumbstick", thumbstick.toJson())
         .put("trigger", trigger)
+        .put("grip", grip)
         .put("squeeze", squeeze)
         .put("buttons", buttons.toJson())
 }

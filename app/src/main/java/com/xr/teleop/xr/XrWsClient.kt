@@ -90,6 +90,17 @@ class XrWsClient(
         return sent
     }
 
+    fun sendCommand(cmd: TeleopCommand): Boolean {
+        val payload = cmd.toJsonString()
+        val sent = webSocket?.send(payload) ?: false
+        if (!sent) {
+            Log.w(TAG, "sendCommand skipped; socket not connected")
+        } else {
+            Log.i(TAG, "sendCommand: ${cmd.command}")
+        }
+        return sent
+    }
+
     /** 暂停时保持连接（Quest onPause 不断开）*/
     fun pause() {
         // 保持 WS 连接，什么都不做
@@ -108,7 +119,8 @@ class XrWsClient(
 
     companion object {
         private const val TAG = "XrWsClient"
-        const val DEFAULT_URL = "ws://10.20.213.58:8765"
+        const val DEFAULT_URL = "ws://10.20.200.200:8765"
+        const val RIGHT_ARM_URL = "ws://10.20.200.200:8765"
         private const val RECONNECT_DELAY_MS = 2000L
     }
 }

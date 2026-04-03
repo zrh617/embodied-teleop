@@ -39,6 +39,15 @@ struct Runtime {
 
     XrActionSet action_set = XR_NULL_HANDLE;
     XrAction hand_pose_action = XR_NULL_HANDLE;
+    XrAction trigger_action = XR_NULL_HANDLE;
+    XrAction squeeze_action = XR_NULL_HANDLE;
+    XrAction thumbstick_action = XR_NULL_HANDLE;
+    XrAction thumbstick_click_action = XR_NULL_HANDLE;
+    XrAction button_a_action = XR_NULL_HANDLE;  // right A
+    XrAction button_b_action = XR_NULL_HANDLE;  // right B
+    XrAction button_x_action = XR_NULL_HANDLE;  // left X
+    XrAction button_y_action = XR_NULL_HANDLE;  // left Y
+    XrAction menu_action = XR_NULL_HANDLE;       // left menu
     XrPath left_hand_path = XR_NULL_PATH;
     XrPath right_hand_path = XR_NULL_PATH;
     XrSpace left_hand_space = XR_NULL_HANDLE;
@@ -49,6 +58,23 @@ struct Runtime {
     bool right_hand_active = false;
     XrPosef left_hand_pose{};
     XrPosef right_hand_pose{};
+
+    // Per-hand analog/button state (updated every frame)
+    float left_trigger = 0.f;
+    float right_trigger = 0.f;
+    float left_squeeze = 0.f;
+    float right_squeeze = 0.f;
+    float left_thumbstick_x = 0.f;
+    float left_thumbstick_y = 0.f;
+    float right_thumbstick_x = 0.f;
+    float right_thumbstick_y = 0.f;
+    bool left_thumbstick_click = false;
+    bool right_thumbstick_click = false;
+    bool button_a = false;   // right controller A
+    bool button_b = false;   // right controller B
+    bool button_x = false;   // left controller X
+    bool button_y = false;   // left controller Y
+    bool button_menu = false; // left controller menu
 
     PFN_xrCreatePassthroughFB xr_create_passthrough_fb = nullptr;
     PFN_xrDestroyPassthroughFB xr_destroy_passthrough_fb = nullptr;

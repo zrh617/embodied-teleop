@@ -288,55 +288,66 @@ std::string GetStatus() {
 }
 
 std::string GetControllerStateJson() {
-    bool left_active = g_app.xr_runtime.left_hand_active;
-    bool right_active = g_app.xr_runtime.right_hand_active;
-    XrPosef left_pose = g_app.xr_runtime.left_hand_pose;
-    XrPosef right_pose = g_app.xr_runtime.right_hand_pose;
+    const auto& rt = g_app.xr_runtime;
+
+    const bool   left_active  = rt.left_hand_active;
+    const bool   right_active = rt.right_hand_active;
+    const XrPosef lp = rt.left_hand_pose;
+    const XrPosef rp = rt.right_hand_pose;
 
     const uint64_t ts_ms = teleop::common::NowMonotonicNanos() / 1000000ULL;
+    static uint64_t seq_counter = 0;
+    const uint64_t seq = ++seq_counter;
 
-    std::ostringstream stream;
-    stream << "{";
-    stream << "\"type\":\"xr_controller_state\",";
-    stream << "\"ts_ms\":" << ts_ms << ",";
-    stream << "\"seq\":" << ts_ms << ",";
-    stream << "\"head\":{";
-    stream << "\"pos\":{\"x\":0.0,\"y\":0.0,\"z\":0.0},";
-    stream << "\"rot\":{\"x\":0.0,\"y\":0.0,\"z\":0.0,\"w\":1.0}";
-    stream << "},";
+    auto jb = [](bool v) { return v ? "true" : "false"; };
 
-    stream << "\"left\":{";
-    stream << "\"connected\":" << (left_active ? "true" : "false") << ",";
-    stream << "\"pos\":{";
-    stream << "\"x\":" << left_pose.position.x << ",";
-    stream << "\"y\":" << left_pose.position.y << ",";
-    stream << "\"z\":" << left_pose.position.z;
-    stream << "},";
-    stream << "\"rot\":{";
-    stream << "\"x\":" << left_pose.orientation.x << ",";
-    stream << "\"y\":" << left_pose.orientation.y << ",";
-    stream << "\"z\":" << left_pose.orientation.z << ",";
-    stream << "\"w\":" << left_pose.orientation.w;
-    stream << "}";
-    stream << "},";
+    std::ostringstream o;
+    o << "{";
+    o << "\"type\":\"xr_controller_state\",";
+    o << "\"ts_ms\":" << ts_ms << ",";
+    o << "\"seq\":"   << seq   << ",";
 
-    stream << "\"right\":{";
-    stream << "\"connected\":" << (right_active ? "true" : "false") << ",";
-    stream << "\"pos\":{";
-    stream << "\"x\":" << right_pose.position.x << ",";
-    stream << "\"y\":" << right_pose.position.y << ",";
-    stream << "\"z\":" << right_pose.position.z;
-    stream << "},";
-    stream << "\"rot\":{";
-    stream << "\"x\":" << right_pose.orientation.x << ",";
-    stream << "\"y\":" << right_pose.orientation.y << ",";
-    stream << "\"z\":" << right_pose.orientation.z << ",";
-    stream << "\"w\":" << right_pose.orientation.w;
-    stream << "}";
-    stream << "}";
-    stream << "}";
+    // head (placeholder — head pose not tracked in this build)
+    o << "\"head\":{\"pos\":{\"x\":0,\"y\":0,\"z\":0},\"rot\":{\"x\":0,\"y\":0,\"z\":0,\"w\":1}},";
 
-    return stream.str();
+    // left controller
+    o << "\"left\":{";
+    o << "\"connected\":" << jb(left_active) << ",";
+    o << "\"pos\":{\"x\":" << lp.position.x    << ",\"y\":" << lp.position.y    << ",\"z\":" << lp.position.z    << "},";
+    o << "\"rot\":{\"x\":" << lp.orientation.x << ",\"y\":" << lp.orientation.y << ",\"z\":" << lp.orientation.z << ",\"w\":" << lp.orientation.w << "},";
+    o << "\"trigger\":"  << rt.left_trigger  << ",";
+    o << "\"grip\":"     << rt.left_squeeze  << ",";
+    o << "\"squeeze\":"  << rt.left_squeeze  << ",";
+    o << "\"thumbstick\":{\"x\":" << rt.left_thumbstick_x << ",\"y\":" << rt.left_thumbstick_y << "},";
+    o << "\"buttons\":{";
+    o << "\"primary\":"        << jb(rt.button_x)             << ",";
+    o << "\"secondary\":"      << jb(rt.button_y)             << ",";
+    o << "\"thumbstick_click\":" << jb(rt.left_thumbstick_click) << ",";
+    o << "\"menu\":"           << jb(rt.button_menu)           << ",";
+    o << "\"system\":false";
+    o << "}}";
+
+    o << ",";
+
+    // right controller
+    o << "\"right\":{";
+    o << "\"connected\":" << jb(right_active) << ",";
+    o << "\"pos\":{\"x\":" << rp.position.x    << ",\"y\":" << rp.position.y    << ",\"z\":" << rp.position.z    << "},";
+    o << "\"rot\":{\"x\":" << rp.orientation.x << ",\"y\":" << rp.orientation.y << ",\"z\":" << rp.orientation.z << ",\"w\":" << rp.orientation.w << "},";
+    o << "\"trigger\":"  << rt.right_trigger  << ",";
+    o << "\"grip\":"     << rt.right_squeeze  << ",";
+    o << "\"squeeze\":"  << rt.right_squeeze  << ",";
+    o << "\"thumbstick\":{\"x\":" << rt.right_thumbstick_x << ",\"y\":" << rt.right_thumbstick_y << "},";
+    o << "\"buttons\":{";
+    o << "\"primary\":"         << jb(rt.button_a)              << ",";
+    o << "\"secondary\":"       << jb(rt.button_b)              << ",";
+    o << "\"thumbstick_click\":" << jb(rt.right_thumbstick_click) << ",";
+    o << "\"menu\":false,";
+    o << "\"system\":false";
+    o << "}}";
+
+    o << "}";
+    return o.str();
 }
 
 }  // namespace teleop::app
